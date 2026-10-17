@@ -62,7 +62,7 @@ function render(){
   const a=$("#app");if(!ready){a.innerHTML='<div class="empty">Loading…</div>';return}
   if(view.car&&!S.cars.find(c=>c.id===view.car))view.car=null;
   if(!view.car){
-    a.innerHTML='<div class="top"><h1>Garage</h1><button class="btn g" id="exp">Export</button></div>'+
+    a.innerHTML='<div class="top"><h1>Garage</h1><button class="btn g" id="imp">Import</button><button class="btn g" id="exp">Export</button></div>'+
     (S.cars.length?S.cars.map(c=>{const ls=carLogs(c.id),f=dueFlags(c),sp=ls.reduce((s,l)=>s+(+l.cost||0),0);
       return `<div class="card car" data-c="${c.id}"><div class="row"><b>${esc(c.name)}</b><span class="sub">${num(odo(c))} mi</span></div>
       <div class="sub">${ls.length?"Last: "+esc(ls[0].type)+" · "+esc(ls[0].date):"No work logged yet"} · ${money(sp)} spent</div>
@@ -70,7 +70,7 @@ function render(){
       '<div class="empty">Add your first car to start logging work.</div>')+
     '<button class="fab" id="addcar">+ Add car</button>';
     a.querySelectorAll("[data-c]").forEach(e=>e.onclick=()=>{view.car=e.dataset.c;render();scrollTo(0,0)});
-    $("#addcar").onclick=()=>carForm();$("#exp").onclick=exportCsv;
+    $("#addcar").onclick=()=>carForm();$("#exp").onclick=exportCsv;$("#imp").onclick=importCsv;
   }else{
     const c=S.cars.find(x=>x.id===view.car),ls=carLogs(c.id),f=dueFlags(c),sp=ls.reduce((s,l)=>s+(+l.cost||0),0);
     a.innerHTML=`<button class="back" id="bk">‹ Garage</button><div class="top"><h1>${esc(c.name)}</h1><button class="btn g" id="ec">Edit</button></div>
@@ -120,5 +120,33 @@ async function exportCsv(){
   try{const d=await claude.use("downloads");if(d){await d.save({filename:"garage-log.csv",data:csv});return}}catch(e){}
   const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));a.download="garage-log.csv";document.body.appendChild(a);a.click();a.remove();
 }
+
+function parseCsv(t){const r=[];let row=[],f="",q=false;
+  for(let i=0;i<t.length;i++){const c=t[i];
+    if(q){if(c=='"'){if(t[i+1]=='"'){f+='"';i++}else q=false}else f+=c}
+    else if(c=='"')q=true;
+    else if(c==","){row.push(f);f=""}
+    else if(c=="\n"||c=="\r"){if(c=="\r"&&t[i+1]=="\n")i++;row.push(f);r.push(row);row=[];f=""}
+    else f+=c}
+  if(f||row.length){row.push(f);r.push(row)}return r}
+function importCsv(){
+  const inp=document.createElement("input");inp.type="file";inp.accept=".csv,text/csv";
+  inp.onchange=async()=>{const file=inp.files[0];if(!file)return;
+    let rows;try{rows=parseCsv((await file.text()).replace(/^\uFEFF/,""))}catch(e){alert("Couldn't read that file.");return}
+    if(!rows.length||rows[0][0].trim()!=="Car"){alert("This doesn't look like a Garage Log export.");return}
+    let addedCars=0,addedLogs=0,skipped=0;
+    const key=l=>[l.car,l.date,l.type,l.miles,l.cost].join("|");
+    const have=new Set(S.logs.map(key));
+    for(const r of rows.slice(1)){
+      if(r.length<3||!r[0].trim())continue;
+      const name=r[0].trim();let car=S.cars.find(c=>c.name.toLowerCase()===name.toLowerCase());
+      if(!car){car={id:uid(),name,odo:""};S.cars.push(car);addedCars++}
+      const l={id:uid(),car:car.id,date:r[1]||today(),type:r[2]||"Other",miles:r[3]||"",cost:r[4]||"",nextMiles:r[5]||"",nextDate:r[6]||"",notes:r[7]||""};
+      if(have.has(key(l))){skipped++;continue}
+      have.add(key(l));S.logs.push(l);addedLogs++;
+      if(+l.miles>+car.odo)car.odo=l.miles}
+    await save();render();
+    alert("Imported "+addedLogs+" entries"+(addedCars?" and "+addedCars+" new car(s)":"")+(skipped?". Skipped "+skipped+" duplicates.":"."))};
+  inp.click()}
 render();load();
 </script></body></html>
