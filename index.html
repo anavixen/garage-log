@@ -81,7 +81,7 @@ function render(){
       ${l.notes?`<div class="sub">${esc(l.notes)}</div>`:""}</div>`).join(""):'<div class="empty">Nothing logged yet.</div>'}</div>
     <button class="fab" id="addlog">+ Log work</button>`;
     $("#bk").onclick=()=>{view.car=null;render()};$("#ec").onclick=()=>carForm(c);$("#addlog").onclick=()=>logForm(c);
-    a.querySelectorAll("[data-l]").forEach(e=>e.onclick=()=>logForm(c,S.logs.find(l=>l.id===e.dataset.l)));
+       a.querySelectorAll("[data-l]").forEach(e=>{e.onclick=()=>logForm(c,S.logs.find(l=>l.id===e.dataset.l));swipeDel(e,e.dataset.l)});
   }
 }
 function sheet(html){const s=document.createElement("div");s.className="sheet";s.innerHTML="<div>"+html+"</div>";s.onclick=e=>{if(e.target===s)s.remove()};document.body.appendChild(s);return s}
@@ -150,5 +150,11 @@ function importCsv(){
     await save();render();
     alert("Imported "+addedLogs+" entries"+(addedCars?" and "+addedCars+" new car(s)":"")+(skipped?". Skipped "+skipped+" duplicates.":"."))};
   inp.click()}
-render();load();
+   function swipeDel(el,id){let x0=0,y0=0,dx=0,dy=0;
+     el.addEventListener("touchstart",e=>{x0=e.touches[0].clientX;y0=e.touches[0].clientY;dx=0;dy=0;el.style.transition="none"},{passive:true});
+     el.addEventListener("touchmove",e=>{dx=e.touches[0].clientX-x0;dy=e.touches[0].clientY-y0;if(dx<0&&Math.abs(dx)>Math.abs(dy))el.style.transform="translateX("+dx+"px)"},{passive:true});
+     el.addEventListener("touchend",()=>{el.style.transition="transform .2s";el.style.transform="";
+       if(dx<-100&&Math.abs(dx)>Math.abs(dy)*2&&confirm("Delete this entry?")){S.logs=S.logs.filter(x=>x.id!==id);save();render()}});
+   }
+  render();load();
 </script></body></html>
