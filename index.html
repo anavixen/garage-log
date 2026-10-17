@@ -16,11 +16,11 @@ h1{font-size:26px;margin:8px 0 14px;letter-spacing:-.5px}
 .top{display:flex;align-items:center;gap:8px}.top h1{flex:1}
 .back{background:none;border:0;color:var(--acc);font-size:16px;padding:8px 0;cursor:pointer}
 .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
-.car{cursor:pointer}.car b{font-size:18px}.sub{color:var(--mute);font-size:14px}
+.car{cursor:pointer;padding:0;overflow:hidden;position:relative}.car .in{padding:14px}.car b{font-size:18px}.sub{color:var(--mute);font-size:14px}
 .pill{display:inline-block;font-size:12px;padding:2px 9px;border-radius:99px;border:1px solid currentColor;margin:6px 6px 0 0}
 .ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}
 .row{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
-.log{border-bottom:1px solid var(--line);padding:12px 0;cursor:pointer}.log:last-child{border:0}
+.log{border-bottom:1px solid var(--line);position:relative;overflow:hidden;cursor:pointer}.in{padding:12px 0;background:var(--card);position:relative;transition:transform .2s}.del{position:absolute;right:0;top:0;bottom:0;width:92px;background:#d92d20;color:#fff;border:0;font:inherit;font-weight:600;cursor:pointer}.log:last-child{border:0}
 .fab{position:fixed;right:18px;bottom:calc(18px + env(safe-area-inset-bottom,0px));background:var(--acc);color:var(--accink);border:0;border-radius:99px;padding:14px 22px;font-size:16px;font-weight:600;box-shadow:0 4px 14px rgba(0,0,0,.25);cursor:pointer}
 .btn{background:var(--acc);color:var(--accink);border:0;border-radius:10px;padding:12px 16px;font-size:16px;font-weight:600;cursor:pointer}
 .btn.g{background:transparent;color:var(--ink);border:1px solid var(--line)}.btn.d{background:transparent;color:var(--bad);border:1px solid var(--line)}
@@ -64,24 +64,30 @@ function render(){
   if(!view.car){
     a.innerHTML='<div class="top"><h1>Garage</h1><button class="btn g" id="imp">Import</button><button class="btn g" id="exp">Export</button></div>'+
     (S.cars.length?S.cars.map(c=>{const ls=carLogs(c.id),f=dueFlags(c),sp=ls.reduce((s,l)=>s+(+l.cost||0),0);
-      return `<div class="card car" data-c="${c.id}"><div class="row"><b>${esc(c.name)}</b><span class="sub">${num(odo(c))} mi</span></div>
+      return `<div class="card car" data-c="${c.id}"><div class="in"><div class="row"><b>${esc(c.name)}</b><span class="sub">${num(odo(c))} mi</span></div>
       <div class="sub">${ls.length?"Last: "+esc(ls[0].type)+" · "+esc(ls[0].date):"No work logged yet"} · ${money(sp)} spent</div>
-      ${f.map(x=>`<span class="pill ${x[0]}">${esc(x[1])}</span>`).join("")}</div>`}).join(""):
+      ${f.map(x=>`<span class="pill ${x[0]}">${esc(x[1])}</span>`).join("")}</div><button class="del">Delete</button></div>`}).join(""):
       '<div class="empty">Add your first car to start logging work.</div>')+
     '<button class="fab" id="addcar">+ Add car</button>';
-    a.querySelectorAll("[data-c]").forEach(e=>e.onclick=()=>{view.car=e.dataset.c;render();scrollTo(0,0)});
+    a.querySelectorAll("[data-c]").forEach(e=>{const id=e.dataset.c;
+      e.onclick=ev=>{if(ev.target.closest(".del")||Date.now()-(e._sw||0)<400)return;if(e.classList.contains("open")){closeRows();return}view.car=id;render();scrollTo(0,0)};
+      e.querySelector(".del").onclick=()=>{if(confirm("Delete this car and all its logs?")){S.logs=S.logs.filter(l=>l.car!==id);S.cars=S.cars.filter(x=>x.id!==id);save();render()}};
+      swipeDel(e)});
     $("#addcar").onclick=()=>carForm();$("#exp").onclick=exportCsv;$("#imp").onclick=importCsv;
   }else{
     const c=S.cars.find(x=>x.id===view.car),ls=carLogs(c.id),f=dueFlags(c),sp=ls.reduce((s,l)=>s+(+l.cost||0),0);
     a.innerHTML=`<button class="back" id="bk">‹ Garage</button><div class="top"><h1>${esc(c.name)}</h1><button class="btn g" id="ec">Edit</button></div>
     <div class="card"><div class="stat"><div><b>${num(odo(c))}</b>miles</div><div><b>${ls.length}</b>jobs</div><div><b>${money(sp)}</b>spent</div></div>
     ${f.map(x=>`<span class="pill ${x[0]}">${esc(x[1])}</span>`).join("")}</div>
-    <div class="card">${ls.length?ls.map(l=>`<div class="log" data-l="${l.id}"><div class="row"><b>${esc(l.type)}</b><span class="sub">${esc(l.date)}</span></div>
+    <div class="card">${ls.length?ls.map(l=>`<div class="log" data-l="${l.id}"><div class="in"><div class="row"><b>${esc(l.type)}</b><span class="sub">${esc(l.date)}</span></div>
       <div class="sub">${l.miles?num(l.miles)+" mi":""}${l.miles&&l.cost?" · ":""}${l.cost?money(l.cost):""}</div>
-      ${l.notes?`<div class="sub">${esc(l.notes)}</div>`:""}</div>`).join(""):'<div class="empty">Nothing logged yet.</div>'}</div>
+      ${l.notes?`<div class="sub">${esc(l.notes)}</div>`:""}</div><button class="del">Delete</button></div>`).join(""):'<div class="empty">Nothing logged yet.</div>'}</div>
     <button class="fab" id="addlog">+ Log work</button>`;
     $("#bk").onclick=()=>{view.car=null;render()};$("#ec").onclick=()=>carForm(c);$("#addlog").onclick=()=>logForm(c);
-       a.querySelectorAll("[data-l]").forEach(e=>{e.onclick=()=>logForm(c,S.logs.find(l=>l.id===e.dataset.l));swipeDel(e,e.dataset.l)});
+    a.querySelectorAll("[data-l]").forEach(e=>{const id=e.dataset.l;
+      e.onclick=ev=>{if(ev.target.closest(".del")||Date.now()-(e._sw||0)<400)return;if(e.classList.contains("open")){closeRows();return}logForm(c,S.logs.find(l=>l.id===id))};
+      e.querySelector(".del").onclick=()=>{if(confirm("Delete this entry?")){S.logs=S.logs.filter(x=>x.id!==id);save();render()}};
+      swipeDel(e)});
   }
 }
 function sheet(html){const s=document.createElement("div");s.className="sheet";s.innerHTML="<div>"+html+"</div>";s.onclick=e=>{if(e.target===s)s.remove()};document.body.appendChild(s);return s}
@@ -150,11 +156,15 @@ function importCsv(){
     await save();render();
     alert("Imported "+addedLogs+" entries"+(addedCars?" and "+addedCars+" new car(s)":"")+(skipped?". Skipped "+skipped+" duplicates.":"."))};
   inp.click()}
-   function swipeDel(el,id){let x0=0,y0=0,dx=0,dy=0;
-     el.addEventListener("touchstart",e=>{x0=e.touches[0].clientX;y0=e.touches[0].clientY;dx=0;dy=0;el.style.transition="none"},{passive:true});
-     el.addEventListener("touchmove",e=>{dx=e.touches[0].clientX-x0;dy=e.touches[0].clientY-y0;if(dx<0&&Math.abs(dx)>Math.abs(dy))el.style.transform="translateX("+dx+"px)"},{passive:true});
-     el.addEventListener("touchend",()=>{el.style.transition="transform .2s";el.style.transform="";
-       if(dx<-100&&Math.abs(dx)>Math.abs(dy)*2&&confirm("Delete this entry?")){S.logs=S.logs.filter(x=>x.id!==id);save();render()}});
-   }
-  render();load();
+function closeRows(except){document.querySelectorAll(".log.open,.car.open").forEach(r=>{if(r!==except){r.classList.remove("open");r.querySelector(".in").style.transform=""}})}
+function swipeDel(row){const inn=row.querySelector(".in");let x0=0,y0=0,dx=0,dy=0,base=0,drag=false;
+  row.addEventListener("touchstart",e=>{drag=false;if(e.target.closest(".del"))return;closeRows(row);
+    x0=e.touches[0].clientX;y0=e.touches[0].clientY;dx=0;dy=0;base=row.classList.contains("open")?-92:0;inn.style.transition="none"},{passive:true});
+  row.addEventListener("touchmove",e=>{dx=e.touches[0].clientX-x0;dy=e.touches[0].clientY-y0;
+    if(Math.abs(dx)>Math.abs(dy)&&Math.abs(dx)>6)drag=true;
+    if(drag)inn.style.transform="translateX("+Math.max(-92,Math.min(0,base+dx))+"px)"},{passive:true});
+  row.addEventListener("touchend",()=>{inn.style.transition="";if(!drag)return;row._sw=Date.now();
+    const open=base+dx<-46;row.classList.toggle("open",open);inn.style.transform=open?"translateX(-92px)":""});
+}
+render();load();
 </script></body></html>
