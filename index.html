@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Garage Log</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+--bg:#f4f2ee;--card:#fff;--ink:#1c1b19;--mute:#76726b;--line:#e4e0d8;--acc:#d9531e;--accink:#fff;--ok:#2f7d4f;--warn:#b7791f;--bad:#c0392b}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#151412;--card:#201f1c;--ink:#f1eee8;--mute:#9a958b;--line:#33312c;--acc:#f06a35;--accink:#1a1008;--ok:#5ec486;--warn:#e0b04a;--bad:#ef6a5a}}
+:root[data-theme="dark"]{--bg:#151412;--card:#201f1c;--ink:#f1eee8;--mute:#9a958b;--line:#33312c;--acc:#f06a35;--accink:#1a1008;--ok:#5ec486;--warn:#e0b04a;--bad:#ef6a5a}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 -apple-system,system-ui,"Segoe UI",Roboto,sans-serif}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);background:var(--bg);z-index:10}
+main{max-width:560px;margin:0 auto;padding:16px 16px 96px}
+h1{font-size:26px;margin:8px 0 14px;letter-spacing:-.5px}
+.top{display:flex;align-items:center;gap:8px}.top h1{flex:1}
+.back{background:none;border:0;color:var(--acc);font-size:16px;padding:8px 0;cursor:pointer}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
+.car{cursor:pointer}.car b{font-size:18px}.sub{color:var(--mute);font-size:14px}
+.pill{display:inline-block;font-size:12px;padding:2px 9px;border-radius:99px;border:1px solid currentColor;margin:6px 6px 0 0}
+.ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}
+.row{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.log{border-bottom:1px solid var(--line);padding:12px 0;cursor:pointer}.log:last-child{border:0}
+.fab{position:fixed;right:18px;bottom:calc(18px + env(safe-area-inset-bottom,0px));background:var(--acc);color:var(--accink);border:0;border-radius:99px;padding:14px 22px;font-size:16px;font-weight:600;box-shadow:0 4px 14px rgba(0,0,0,.25);cursor:pointer}
+.btn{background:var(--acc);color:var(--accink);border:0;border-radius:10px;padding:12px 16px;font-size:16px;font-weight:600;cursor:pointer}
+.btn.g{background:transparent;color:var(--ink);border:1px solid var(--line)}.btn.d{background:transparent;color:var(--bad);border:1px solid var(--line)}
+.sheet{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:flex-end;justify-content:center;z-index:20}
+.sheet>div{background:var(--bg);width:100%;max-width:560px;max-height:92%;overflow:auto;border-radius:18px 18px 0 0;padding:18px 16px calc(24px + env(safe-area-inset-bottom,0px))}
+label{display:block;font-size:13px;color:var(--mute);margin:12px 0 4px}
+input,select,textarea{width:100%;font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:10px;padding:11px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}.chip{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:99px;padding:8px 13px;font-size:14px;cursor:pointer}
+.chip.on{background:var(--acc);color:var(--accink);border-color:var(--acc)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}.acts{display:flex;gap:10px;margin-top:18px}.acts .btn{flex:1}
+.empty{text-align:center;color:var(--mute);padding:40px 10px}
+.stat{display:flex;gap:18px;margin-top:8px}.stat div{font-size:13px;color:var(--mute)}.stat b{display:block;font-size:18px;color:var(--ink)}
+</style></head><body><main id="app"></main>
+<script>
+const TYPES=["Oil change","Tire rotation","Air filter","Cabin filter","Brakes","Battery","Coolant","Spark plugs","Transmission fluid","Wipers","Other"];
+let S={cars:[],logs:[]},view={car:null},ref=null,ready=false;
+const $=s=>document.querySelector(s),esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const uid=()=>Math.random().toString(36).slice(2,10),today=()=>new Date().toISOString().slice(0,10);
+const money=n=>"$"+(+n||0).toFixed(2),num=n=>(+n||0).toLocaleString();
+async function load(){
+  try{const u=await claude.use("user"),db=await claude.use("db");
+    if(u&&db){const id=await u.id();if(id){ref=db.doc("data/users/"+id+"/store/main");const s=await ref.get();if(s.exists)S=Object.assign({cars:[],logs:[]},s.data());}}}catch(e){}
+  if(!ref){try{const r=localStorage.getItem("garage");if(r)S=JSON.parse(r)}catch(e){}}
+  ready=true;render();
+}
+async function save(){
+  if(ref){try{await ref.set(JSON.parse(JSON.stringify(S)))}catch(e){}}
+  else{try{localStorage.setItem("garage",JSON.stringify(S))}catch(e){}}
+}
+function carLogs(id){return S.logs.filter(l=>l.car===id).sort((a,b)=>b.date.localeCompare(a.date)||(b.miles||0)-(a.miles||0))}
+function odo(c){const m=carLogs(c.id).map(l=>+l.miles||0);return Math.max(+c.odo||0,...m,0)}
+function dueFlags(c){ // latest entry per service type with next-due info
+  const seen={},out=[],o=odo(c),t=today();
+  for(const l of carLogs(c.id)){if(seen[l.type])continue;seen[l.type]=1;
+    if(l.nextMiles){const d=+l.nextMiles-o;if(d<=0)out.push(["bad",l.type+" overdue by "+num(-d)+" mi"]);else if(d<=500)out.push(["warn",l.type+" due in "+num(d)+" mi"])}
+    if(l.nextDate){const d=Math.round((new Date(l.nextDate)-new Date(t))/864e5);if(d<0)out.push(["bad",l.type+" overdue "+(-d)+"d"]);else if(d<=30)out.push(["warn",l.type+" due in "+d+"d"])}}
+  return out}
+function render(){
+  const a=$("#app");if(!ready){a.innerHTML='<div class="empty">Loading…</div>';return}
+  if(view.car&&!S.cars.find(c=>c.id===view.car))view.car=null;
+  if(!view.car){
+    a.innerHTML='<div class="top"><h1>Garage</h1><button class="btn g" id="exp">Export</button></div>'+
+    (S.cars.length?S.cars.map(c=>{const ls=carLogs(c.id),f=dueFlags(c),sp=ls.reduce((s,l)=>s+(+l.cost||0),0);
+      return `<div class="card car" data-c="${c.id}"><div class="row"><b>${esc(c.name)}</b><span class="sub">${num(odo(c))} mi</span></div>
+      <div class="sub">${ls.length?"Last: "+esc(ls[0].type)+" · "+esc(ls[0].date):"No work logged yet"} · ${money(sp)} spent</div>
+      ${f.map(x=>`<span class="pill ${x[0]}">${esc(x[1])}</span>`).join("")}</div>`}).join(""):
+      '<div class="empty">Add your first car to start logging work.</div>')+
+    '<button class="fab" id="addcar">+ Add car</button>';
+    a.querySelectorAll("[data-c]").forEach(e=>e.onclick=()=>{view.car=e.dataset.c;render();scrollTo(0,0)});
+    $("#addcar").onclick=()=>carForm();$("#exp").onclick=exportCsv;
+  }else{
+    const c=S.cars.find(x=>x.id===view.car),ls=carLogs(c.id),f=dueFlags(c),sp=ls.reduce((s,l)=>s+(+l.cost||0),0);
+    a.innerHTML=`<button class="back" id="bk">‹ Garage</button><div class="top"><h1>${esc(c.name)}</h1><button class="btn g" id="ec">Edit</button></div>
+    <div class="card"><div class="stat"><div><b>${num(odo(c))}</b>miles</div><div><b>${ls.length}</b>jobs</div><div><b>${money(sp)}</b>spent</div></div>
+    ${f.map(x=>`<span class="pill ${x[0]}">${esc(x[1])}</span>`).join("")}</div>
+    <div class="card">${ls.length?ls.map(l=>`<div class="log" data-l="${l.id}"><div class="row"><b>${esc(l.type)}</b><span class="sub">${esc(l.date)}</span></div>
+      <div class="sub">${l.miles?num(l.miles)+" mi":""}${l.miles&&l.cost?" · ":""}${l.cost?money(l.cost):""}</div>
+      ${l.notes?`<div class="sub">${esc(l.notes)}</div>`:""}</div>`).join(""):'<div class="empty">Nothing logged yet.</div>'}</div>
+    <button class="fab" id="addlog">+ Log work</button>`;
+    $("#bk").onclick=()=>{view.car=null;render()};$("#ec").onclick=()=>carForm(c);$("#addlog").onclick=()=>logForm(c);
+    a.querySelectorAll("[data-l]").forEach(e=>e.onclick=()=>logForm(c,S.logs.find(l=>l.id===e.dataset.l)));
+  }
+}
+function sheet(html){const s=document.createElement("div");s.className="sheet";s.innerHTML="<div>"+html+"</div>";s.onclick=e=>{if(e.target===s)s.remove()};document.body.appendChild(s);return s}
+function carForm(c){
+  const s=sheet(`<h1>${c?"Edit car":"Add car"}</h1><label>Name</label><input id="n" placeholder="2015 Honda Civic" value="${esc(c?.name)}">
+  <label>Current mileage</label><input id="o" type="number" inputmode="numeric" value="${esc(c?.odo)}">
+  <div class="acts">${c?'<button class="btn d" id="del">Delete</button>':""}<button class="btn g" id="x">Cancel</button><button class="btn" id="ok">Save</button></div>`);
+  s.querySelector("#x").onclick=()=>s.remove();
+  s.querySelector("#ok").onclick=()=>{const n=s.querySelector("#n").value.trim();if(!n)return;const o=s.querySelector("#o").value;
+    if(c){c.name=n;c.odo=o}else{const x={id:uid(),name:n,odo:o};S.cars.push(x);}save();s.remove();render()};
+  if(c)s.querySelector("#del").onclick=()=>{if(confirm("Delete this car and all its logs?")){S.logs=S.logs.filter(l=>l.car!==c.id);S.cars=S.cars.filter(x=>x.id!==c.id);view.car=null;save();s.remove();render()}};
+}
+function logForm(c,l){
+  let type=l?.type||TYPES[0];const v=k=>esc(l?.[k]??"");
+  const s=sheet(`<h1>${l?"Edit entry":"Log work"}</h1><div class="chips">${TYPES.map(t=>`<button class="chip${t===type?" on":""}" data-t="${t}">${t}</button>`).join("")}</div>
+  <label>Custom name (optional)</label><input id="cu" value="${TYPES.includes(type)?"":esc(type)}" placeholder="e.g. Replaced O2 sensor">
+  <div class="two"><div><label>Date</label><input id="d" type="date" value="${l?.date||today()}"></div><div><label>Mileage</label><input id="m" type="number" inputmode="numeric" value="${v("miles")||odo(c)||""}"></div></div>
+  <div class="two"><div><label>Cost ($)</label><input id="c" type="number" step="0.01" inputmode="decimal" value="${v("cost")}"></div><div><label>Next due (miles)</label><input id="nm" type="number" inputmode="numeric" value="${v("nextMiles")}"></div></div>
+  <label>Next due (date, optional)</label><input id="nd" type="date" value="${v("nextDate")}">
+  <label>Notes / parts used</label><textarea id="no" rows="3" placeholder="5W-30 synthetic, Wix filter…">${v("notes")}</textarea>
+  <div class="acts">${l?'<button class="btn d" id="del">Delete</button>':""}<button class="btn g" id="x">Cancel</button><button class="btn" id="ok">Save</button></div>`);
+  s.querySelectorAll(".chip").forEach(b=>b.onclick=()=>{type=b.dataset.t;s.querySelector("#cu").value="";s.querySelectorAll(".chip").forEach(x=>x.classList.toggle("on",x===b))});
+  s.querySelector("#cu").oninput=e=>{if(e.target.value)s.querySelectorAll(".chip").forEach(x=>x.classList.remove("on"))};
+  s.querySelector("#x").onclick=()=>s.remove();
+  s.querySelector("#ok").onclick=()=>{const q=i=>s.querySelector(i).value,t=q("#cu").trim()||type;
+    const o={id:l?.id||uid(),car:c.id,type:t,date:q("#d")||today(),miles:q("#m"),cost:q("#c"),nextMiles:q("#nm"),nextDate:q("#nd"),notes:q("#no").trim()};
+    if(l)Object.assign(l,o);else S.logs.push(o);
+    if(+o.miles>+c.odo)c.odo=o.miles;save();s.remove();render()};
+  if(l)s.querySelector("#del").onclick=()=>{if(confirm("Delete this entry?")){S.logs=S.logs.filter(x=>x.id!==l.id);save();s.remove();render()}};
+}
+async function exportCsv(){
+  const q=x=>'"'+String(x??"").replace(/"/g,'""')+'"';
+  const rows=[["Car","Date","Service","Miles","Cost","Next due miles","Next due date","Notes"].join(",")];
+  S.logs.slice().sort((a,b)=>a.date.localeCompare(b.date)).forEach(l=>{const c=S.cars.find(x=>x.id===l.car);rows.push([c?.name,l.date,l.type,l.miles,l.cost,l.nextMiles,l.nextDate,l.notes].map(q).join(","))});
+  const csv=rows.join("\n");
+  try{const d=await claude.use("downloads");if(d){await d.save({filename:"garage-log.csv",data:csv});return}}catch(e){}
+  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));a.download="garage-log.csv";document.body.appendChild(a);a.click();a.remove();
+}
+render();load();
+</script></body></html>
