@@ -116,6 +116,7 @@ async function exportCsv(){
   const q=x=>'"'+String(x??"").replace(/"/g,'""')+'"';
   const rows=[["Car","Date","Service","Miles","Cost","Next due miles","Next due date","Notes"].join(",")];
   S.logs.slice().sort((a,b)=>a.date.localeCompare(b.date)).forEach(l=>{const c=S.cars.find(x=>x.id===l.car);rows.push([c?.name,l.date,l.type,l.miles,l.cost,l.nextMiles,l.nextDate,l.notes].map(q).join(","))});
+  S.cars.forEach(c=>{if(!S.logs.some(l=>l.car===c.id))rows.push([c.name,"","",odo(c),"","","",""].map(q).join(","))});
   const csv=rows.join("\n");
   try{const d=await claude.use("downloads");if(d){await d.save({filename:"garage-log.csv",data:csv});return}}catch(e){}
   const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));a.download="garage-log.csv";document.body.appendChild(a);a.click();a.remove();
@@ -141,6 +142,7 @@ function importCsv(){
       if(r.length<3||!r[0].trim())continue;
       const name=r[0].trim();let car=S.cars.find(c=>c.name.toLowerCase()===name.toLowerCase());
       if(!car){car={id:uid(),name,odo:""};S.cars.push(car);addedCars++}
+      if(!(r[1]||"").trim()&&!(r[2]||"").trim()){if(+r[3]>+car.odo)car.odo=r[3];continue}
       const l={id:uid(),car:car.id,date:r[1]||today(),type:r[2]||"Other",miles:r[3]||"",cost:r[4]||"",nextMiles:r[5]||"",nextDate:r[6]||"",notes:r[7]||""};
       if(have.has(key(l))){skipped++;continue}
       have.add(key(l));S.logs.push(l);addedLogs++;
