@@ -64,8 +64,8 @@ function render(){
   if(!view.car){
     a.innerHTML='<div class="top"><h1>Vixen&rsquo;s Garage</h1><button class="btn g" id="imp">Import</button><button class="btn g" id="exp">Export</button></div>'+
     (S.cars.length?S.cars.map(c=>{const ls=carLogs(c.id),f=dueFlags(c),sp=ls.reduce((s,l)=>s+(+l.cost||0),0);
-      return `<div class="card car" data-c="${c.id}"><div class="in"><div class="row"><b>${esc(c.name)}</b><span class="sub">${num(odo(c))} mi</span></div>
-      <div class="sub">${ls.length?"Last: "+esc(ls[0].type)+" · "+esc(ls[0].date):"No work logged yet"} · ${money(sp)} spent</div>
+      return `<div class="card car" data-c="${c.id}"><div class="in"><div class="row"><b>${esc(c.nick||c.name)}</b><span class="sub">${num(odo(c))} mi</span></div>
+      ${c.nick?`<div class="sub">${esc(c.name)}</div>`:""}<div class="sub">${ls.length?"Last: "+esc(ls[0].type)+" · "+esc(ls[0].date):"No work logged yet"} · ${money(sp)} spent</div>
       ${f.map(x=>`<span class="pill ${x[0]}">${esc(x[1])}</span>`).join("")}</div><button class="del">Delete</button></div>`}).join(""):
       '<div class="empty">Add your first car to start logging work.</div>')+
     '<button class="fab" id="addcar">+ Add car</button>';
@@ -76,7 +76,8 @@ function render(){
     $("#addcar").onclick=()=>carForm();$("#exp").onclick=exportCsv;$("#imp").onclick=importCsv;
   }else{
     const c=S.cars.find(x=>x.id===view.car),ls=carLogs(c.id),f=dueFlags(c),sp=ls.reduce((s,l)=>s+(+l.cost||0),0);
-    a.innerHTML=`<button class="back" id="bk">‹ Garage</button><div class="top"><h1>${esc(c.name)}</h1><button class="btn g" id="ec">Edit</button></div>
+    a.innerHTML=`<button class="back" id="bk">‹ Garage</button><div class="top"><h1>${esc(c.nick||c.name)}</h1><button class="btn g" id="ec">Edit</button></div>
+    ${c.nick?`<div class="sub" style="margin:-10px 0 14px">${esc(c.name)}</div>`:""}
     <div class="card"><div class="stat"><div><b>${num(odo(c))}</b>miles</div><div><b>${ls.length}</b>jobs</div><div><b>${money(sp)}</b>spent</div></div>
     ${f.map(x=>`<span class="pill ${x[0]}">${esc(x[1])}</span>`).join("")}</div>
     <div class="card">${ls.length?ls.map(l=>`<div class="log" data-l="${l.id}"><div class="in"><div class="row"><b>${esc(l.type)}</b><span class="sub">${esc(l.date)}</span></div>
@@ -92,12 +93,13 @@ function render(){
 }
 function sheet(html){const s=document.createElement("div");s.className="sheet";s.innerHTML="<div>"+html+"</div>";s.onclick=e=>{if(e.target===s)s.remove()};document.body.appendChild(s);return s}
 function carForm(c){
-  const s=sheet(`<h1>${c?"Edit car":"Add car"}</h1><label>Name</label><input id="n" placeholder="2015 Honda Civic" value="${esc(c?.name)}">
+  const s=sheet(`<h1>${c?"Edit car":"Add car"}</h1><label>Nickname (optional)</label><input id="nk" placeholder="Big Red" value="${esc(c?.nick)}">
+  <label>Year, make &amp; model</label><input id="n" placeholder="2015 Honda Civic" value="${esc(c?.name)}">
   <label>Current mileage</label><input id="o" type="number" inputmode="numeric" value="${esc(c?.odo)}">
   <div class="acts">${c?'<button class="btn d" id="del">Delete</button>':""}<button class="btn g" id="x">Cancel</button><button class="btn" id="ok">Save</button></div>`);
   s.querySelector("#x").onclick=()=>s.remove();
-  s.querySelector("#ok").onclick=()=>{const n=s.querySelector("#n").value.trim();if(!n)return;const o=s.querySelector("#o").value;
-    if(c){c.name=n;c.odo=o}else{const x={id:uid(),name:n,odo:o};S.cars.push(x);}save();s.remove();render()};
+  s.querySelector("#ok").onclick=()=>{const n=s.querySelector("#n").value.trim();if(!n)return;const o=s.querySelector("#o").value,nk=s.querySelector("#nk").value.trim();
+    if(c){c.name=n;c.nick=nk;c.odo=o}else{const x={id:uid(),name:n,nick:nk,odo:o};S.cars.push(x);}save();s.remove();render()};
   if(c)s.querySelector("#del").onclick=()=>{if(confirm("Delete this car and all its logs?")){S.logs=S.logs.filter(l=>l.car!==c.id);S.cars=S.cars.filter(x=>x.id!==c.id);view.car=null;save();s.remove();render()}};
 }
 function logForm(c,l){
@@ -120,9 +122,9 @@ function logForm(c,l){
 }
 async function exportCsv(){
   const q=x=>'"'+String(x??"").replace(/"/g,'""')+'"';
-  const rows=[["Car","Date","Service","Miles","Cost","Next due miles","Next due date","Notes"].join(",")];
-  S.logs.slice().sort((a,b)=>a.date.localeCompare(b.date)).forEach(l=>{const c=S.cars.find(x=>x.id===l.car);rows.push([c?.name,l.date,l.type,l.miles,l.cost,l.nextMiles,l.nextDate,l.notes].map(q).join(","))});
-  S.cars.forEach(c=>{if(!S.logs.some(l=>l.car===c.id))rows.push([c.name,"","",odo(c),"","","",""].map(q).join(","))});
+  const rows=[["Car","Date","Service","Miles","Cost","Next due miles","Next due date","Notes","Nickname"].join(",")];
+  S.logs.slice().sort((a,b)=>a.date.localeCompare(b.date)).forEach(l=>{const c=S.cars.find(x=>x.id===l.car);rows.push([c?.name,l.date,l.type,l.miles,l.cost,l.nextMiles,l.nextDate,l.notes,c?.nick].map(q).join(","))});
+  S.cars.forEach(c=>{if(!S.logs.some(l=>l.car===c.id))rows.push([c.name,"","",odo(c),"","","","",c.nick].map(q).join(","))});
   const csv=rows.join("\n");
   try{const d=await claude.use("downloads");if(d){await d.save({filename:"garage-log.csv",data:csv});return}}catch(e){}
   const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));a.download="garage-log.csv";document.body.appendChild(a);a.click();a.remove();
@@ -148,6 +150,7 @@ function importCsv(){
       if(r.length<3||!r[0].trim())continue;
       const name=r[0].trim();let car=S.cars.find(c=>c.name.toLowerCase()===name.toLowerCase());
       if(!car){car={id:uid(),name,odo:""};S.cars.push(car);addedCars++}
+      if(!car.nick&&(r[8]||"").trim())car.nick=r[8].trim();
       if(!(r[1]||"").trim()&&!(r[2]||"").trim()){if(+r[3]>+car.odo)car.odo=r[3];continue}
       const l={id:uid(),car:car.id,date:r[1]||today(),type:r[2]||"Other",miles:r[3]||"",cost:r[4]||"",nextMiles:r[5]||"",nextDate:r[6]||"",notes:r[7]||""};
       if(have.has(key(l))){skipped++;continue}
