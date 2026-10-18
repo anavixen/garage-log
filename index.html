@@ -19,7 +19,7 @@ h1{font-size:26px;margin:8px 0 14px;letter-spacing:-.5px}
 .car{cursor:pointer;padding:0;overflow:hidden;position:relative}.car .in{padding:14px}.car b{font-size:18px}.sub{color:var(--mute);font-size:14px}
 .pill{display:inline-block;font-size:12px;padding:2px 9px;border-radius:99px;border:1px solid currentColor;margin:6px 6px 0 0}
 .ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}
-.row{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.row{display:flex;justify-content:space-between;gap:10px;align-items:baseline}.row .sub{white-space:nowrap}
 .log{border-bottom:1px solid var(--line);position:relative;overflow:hidden;cursor:pointer}.in{padding:12px 0;background:var(--card);position:relative;z-index:1;transition:transform .2s}.del{position:absolute;right:0;top:0;bottom:0;width:92px;background:#d92d20;color:#fff;border:0;font:inherit;font-weight:600;cursor:pointer}.log:last-child{border:0}
 .fab{position:fixed;right:18px;bottom:calc(18px + env(safe-area-inset-bottom,0px));background:var(--acc);color:var(--accink);border:0;border-radius:99px;padding:14px 22px;font-size:16px;font-weight:600;box-shadow:0 4px 14px rgba(0,0,0,.25);cursor:pointer}
 .btn{background:var(--acc);color:var(--accink);border:0;border-radius:10px;padding:12px 16px;font-size:16px;font-weight:600;cursor:pointer}
@@ -81,6 +81,7 @@ function render(){
     ${carInfo(c)?`<div class="sub" style="margin:-10px 0 14px">${carInfo(c)}</div>`:""}
     <div class="card"><div class="stat"><div><b>${num(odo(c))}</b>miles</div><div><b>${ls.length}</b>jobs</div><div><b>${money(sp)}</b>spent</div></div>
     ${f.map(x=>`<span class="pill ${x[0]}">${esc(x[1])}</span>`).join("")}</div>
+    ${c.notes?`<div class="card"><div class="sub">Notes</div><div style="white-space:pre-wrap;margin-top:4px">${esc(c.notes)}</div></div>`:""}
     <div class="card">${ls.length?ls.map(l=>`<div class="log" data-l="${l.id}"><div class="in"><div class="row"><b>${esc(l.type)}</b><span class="sub">${esc(l.date)}</span></div>
       <div class="sub">${l.miles?num(l.miles)+" mi":""}${l.miles&&l.cost?" · ":""}${l.cost?money(l.cost):""}</div>
       ${l.notes?`<div class="sub">${esc(l.notes)}</div>`:""}</div><button class="del">Delete</button></div>`).join(""):'<div class="empty">Nothing logged yet.</div>'}</div>
@@ -98,10 +99,11 @@ function carForm(c){
   <label>Year, make &amp; model</label><input id="n" placeholder="2015 Honda Civic" value="${esc(c?.name)}">
   <div class="two"><div><label>Engine size</label><input id="en" placeholder="2.0L I4" value="${esc(c?.engine)}"></div><div><label>Current mileage</label><input id="o" type="number" inputmode="numeric" value="${esc(c?.odo)}"></div></div>
   <label>VIN</label><input id="vin" maxlength="17" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="17 characters" value="${esc(c?.vin)}">
+  <label>Notes</label><textarea id="cn" rows="4" placeholder="Tire sizes, oil type, filter part numbers…">${esc(c?.notes)}</textarea>
   <div class="acts">${c?'<button class="btn d" id="del">Delete</button>':""}<button class="btn g" id="x">Cancel</button><button class="btn" id="ok">Save</button></div>`);
   s.querySelector("#x").onclick=()=>s.remove();
-  s.querySelector("#ok").onclick=()=>{const n=s.querySelector("#n").value.trim();if(!n)return;const o=s.querySelector("#o").value,nk=s.querySelector("#nk").value.trim(),en=s.querySelector("#en").value.trim(),vin=s.querySelector("#vin").value.trim().toUpperCase();
-    if(c){Object.assign(c,{name:n,nick:nk,engine:en,vin,odo:o})}else{const x={id:uid(),name:n,nick:nk,engine:en,vin,odo:o};S.cars.push(x);}save();s.remove();render()};
+  s.querySelector("#ok").onclick=()=>{const n=s.querySelector("#n").value.trim();if(!n)return;const o=s.querySelector("#o").value,nk=s.querySelector("#nk").value.trim(),en=s.querySelector("#en").value.trim(),vin=s.querySelector("#vin").value.trim().toUpperCase(),notes=s.querySelector("#cn").value.trim();
+    if(c){Object.assign(c,{name:n,nick:nk,engine:en,vin,notes,odo:o})}else{const x={id:uid(),name:n,nick:nk,engine:en,vin,notes,odo:o};S.cars.push(x);}save();s.remove();render()};
   if(c)s.querySelector("#del").onclick=()=>{if(confirm("Delete this car and all its logs?")){S.logs=S.logs.filter(l=>l.car!==c.id);S.cars=S.cars.filter(x=>x.id!==c.id);view.car=null;save();s.remove();render()}};
 }
 function logForm(c,l){
@@ -124,9 +126,9 @@ function logForm(c,l){
 }
 async function exportCsv(){
   const q=x=>'"'+String(x??"").replace(/"/g,'""')+'"';
-  const rows=[["Car","Date","Service","Miles","Cost","Next due miles","Next due date","Notes","Nickname","Engine","VIN"].join(",")];
-  S.logs.slice().sort((a,b)=>a.date.localeCompare(b.date)).forEach(l=>{const c=S.cars.find(x=>x.id===l.car);rows.push([c?.name,l.date,l.type,l.miles,l.cost,l.nextMiles,l.nextDate,l.notes,c?.nick,c?.engine,c?.vin].map(q).join(","))});
-  S.cars.forEach(c=>{if(!S.logs.some(l=>l.car===c.id))rows.push([c.name,"","",odo(c),"","","","",c.nick,c.engine,c.vin].map(q).join(","))});
+  const rows=[["Car","Date","Service","Miles","Cost","Next due miles","Next due date","Notes","Nickname","Engine","VIN","Car notes"].join(",")];
+  S.logs.slice().sort((a,b)=>a.date.localeCompare(b.date)).forEach(l=>{const c=S.cars.find(x=>x.id===l.car);rows.push([c?.name,l.date,l.type,l.miles,l.cost,l.nextMiles,l.nextDate,l.notes,c?.nick,c?.engine,c?.vin,c?.notes].map(q).join(","))});
+  S.cars.forEach(c=>{if(!S.logs.some(l=>l.car===c.id))rows.push([c.name,"","",odo(c),"","","","",c.nick,c.engine,c.vin,c.notes].map(q).join(","))});
   const csv=rows.join("\n");
   try{const d=await claude.use("downloads");if(d){await d.save({filename:"garage-log.csv",data:csv});return}}catch(e){}
   const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));a.download="garage-log.csv";document.body.appendChild(a);a.click();a.remove();
@@ -152,7 +154,7 @@ function importCsv(){
       if(r.length<3||!r[0].trim())continue;
       const name=r[0].trim();let car=S.cars.find(c=>c.name.toLowerCase()===name.toLowerCase());
       if(!car){car={id:uid(),name,odo:""};S.cars.push(car);addedCars++}
-      [["nick",8],["engine",9],["vin",10]].forEach(([k,i])=>{if(!car[k]&&(r[i]||"").trim())car[k]=r[i].trim()});
+      [["nick",8],["engine",9],["vin",10],["notes",11]].forEach(([k,i])=>{if(!car[k]&&(r[i]||"").trim())car[k]=r[i].trim()});
       if(!(r[1]||"").trim()&&!(r[2]||"").trim()){if(+r[3]>+car.odo)car.odo=r[3];continue}
       const l={id:uid(),car:car.id,date:r[1]||today(),type:r[2]||"Other",miles:r[3]||"",cost:r[4]||"",nextMiles:r[5]||"",nextDate:r[6]||"",notes:r[7]||""};
       if(have.has(key(l))){skipped++;continue}
