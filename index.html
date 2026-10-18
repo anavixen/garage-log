@@ -62,7 +62,7 @@ function render(){
   const a=$("#app");if(!ready){a.innerHTML='<div class="empty">Loading…</div>';return}
   if(view.car&&!S.cars.find(c=>c.id===view.car))view.car=null;
   if(!view.car){
-    a.innerHTML='<div class="top"><h1>Garage</h1><button class="btn g" id="imp">Import</button><button class="btn g" id="exp">Export</button></div>'+
+    a.innerHTML='<div class="top"><h1>Vixen&rsquo;s Garage</h1><button class="btn g" id="imp">Import</button><button class="btn g" id="exp">Export</button></div>'+
     (S.cars.length?S.cars.map(c=>{const ls=carLogs(c.id),f=dueFlags(c),sp=ls.reduce((s,l)=>s+(+l.cost||0),0);
       return `<div class="card car" data-c="${c.id}"><div class="in"><div class="row"><b>${esc(c.name)}</b><span class="sub">${num(odo(c))} mi</span></div>
       <div class="sub">${ls.length?"Last: "+esc(ls[0].type)+" · "+esc(ls[0].date):"No work logged yet"} · ${money(sp)} spent</div>
